@@ -1,5 +1,5 @@
 <?php
-require('C:/xampp/htdocs/Tecno-Total-web/models/conf/connection.php');
+require('/var/www/Tecno-Total-web/models/conf/connection.php');
 class Product_DB
 {
     //atributos

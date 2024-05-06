@@ -38,10 +38,16 @@ class connectionDB
 }
 
 //datos del host
-$host = '64.20.36.19:3306';
-$user = 'u32759_xXJdiuUD1m';
-$password = '5giDpDG8YfslDAxikk=c@UIW';
-$database = 's32759_proyectoweb';
+//servidoor nginx
+//$host = '64.20.36.19:3306';
+//$user = 'u32759_xXJdiuUD1m';
+//$password = '5giDpDG8YfslDAxikk=c@UIW';
+//$database = 's32759_proyectoweb';
+//servidor apache
+$host = '10.0.0.5';
+$user = 'diego';
+$password = '1234';
+$database = 'Tecno';
 //prueba de conexion
 $connection = new connectionDB($host, $user, $password, $database);
 ?>

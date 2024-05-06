@@ -38,15 +38,16 @@ class User_data
 //metodo de registrar al usuario
 function register_user($email_user, $password_user)
 {
+    // Obtener una conexión a la base de datos
     global $connection;
 
     // Generar un ID aleatorio para el usuario
     $random_string = Get_id();
 
     // Encriptar la contraseña del usuario
-    $hash = password_hash($password_user, PASSWORD_DEFAULT);
+    $hash = Encrypt_password($password_user);
 
-    // Consultar si el correo electrónico ya está registrado en la base de datos
+    // Consultar si el correo electrónico ya está registrado
     $sql_verification = "SELECT correo FROM usuario WHERE correo='$email_user'";
     $result_verification = $connection->run_query($sql_verification);
 
@@ -59,83 +60,49 @@ function register_user($email_user, $password_user)
         } else {
             // Insertar el nuevo usuario en la base de datos
             $sql_insert = "INSERT INTO usuario VALUES('$random_string','$email_user',1,'$hash')";
-            $result_insert = $connection->run_query($sql_insert);
-
-            // Verificar si la inserción en la base de datos fue exitosa
-            if ($result_insert) {
-                // URL del servidor WebDAV y ruta al archivo pass.dav
-                $url = 'http://10.0.0.4/pass.dav';
-
-                // Configurar opciones para cURL para realizar una solicitud GET
-                $curl = curl_init($url);
-                curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-                curl_setopt($curl, CURLOPT_USERPWD, 'administrador@gmail.com:12345');
-
-                // Ejecutar la solicitud cURL y capturar la respuesta
-                $contenido_actual = curl_exec($curl);
-
-                // Verificar si la solicitud fue exitosa
-                if ($contenido_actual !== false) {
-                    // Formatear los datos del usuario y contraseña
-                    $datos_usuario = "$email_user:$hash";
-
-                    // Concatenar los nuevos datos al contenido existente con un salto de línea
-                    $contenido_nuevo = $contenido_actual . PHP_EOL . $datos_usuario;
-
-                    // Configurar opciones para cURL para realizar una solicitud PUT con el contenido actualizado
-                    curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
-                    curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type: text/plain'));
-                    curl_setopt($curl, CURLOPT_POSTFIELDS, $contenido_nuevo);
-
-                    // Ejecutar la solicitud cURL para actualizar el archivo pass.dav
-                    $respuesta = curl_exec($curl);
-
-                    // Verificar si la actualización fue exitosa
-                    if ($respuesta !== false) {
-                        echo "Usuario registrado correctamente en el servidor WebDAV: $email_user";
-                    } else {
-                        echo "Error al registrar el usuario en el servidor WebDAV";
-                    }
-                } else {
-                    echo "Error al leer el contenido del archivo pass.dav";
-                }
-
-                // Cerrar la sesión cURL
-                curl_close($curl);
-                // URL para el directorio en tu m      quina webdav
-$directory_url = "http://10.0.0.4/pdfs/$email_user";
-// Inicializar CURL
-$curl = curl_init();
-// Configurar la solicitud CURL
-curl_setopt_array($curl, array(
-    CURLOPT_URL => $directory_url, // URL para el directorio
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_CUSTOMREQUEST => 'MKCOL', // M      todo para crear un directorio
-    CURLOPT_HTTPAUTH => CURLAUTH_BASIC, // Tipo de autenticaci      n
-    CURLOPT_USERPWD => "administrador@gmail.com:12345", 
-    CURLOPT_SSL_VERIFYPEER => false,
-));
-// Ejecutar la solicitud CURL
-$response = curl_exec($curl);
-
-// Obtener el codigo de respuesta HTTP
-$http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-// Cerrar CURL
-curl_close($curl);
- 
-                
-                // Redirigir al usuario a la página de inicio de sesión
-                header('location: ../forms/login.html');
-            } else {
-                echo "Error al insertar el usuario en la base de datos";
-            }
+            $connection->run_query($sql_insert);
             $connection->Close_connection();
+
+            // Formatear los datos del usuario y contraseña
+            $datos_usuario = "$email_user:$password_user\n";
+
+            // URL del servidor WebDAV y ruta al archivo pass.dav
+            $url = 'http://10.0.0.4/pass.dav';
+
+            // Obtener el contenido actual del archivo pass.dav
+            $contenido_actual = file_get_contents($url);
+
+            // Concatenar los nuevos datos al contenido existente con un salto de línea
+            $contenido_nuevo = $contenido_actual . "\n" . $datos_usuario;
+
+            // Configurar opciones para cURL
+            $curl = curl_init($url);
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "PUT");
+            curl_setopt($curl, CURLOPT_HTTPHEADER, array('Content-Type: text/plain'));
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $contenido_nuevo);
+            curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            curl_setopt($curl, CURLOPT_USERPWD, '3@gmail.com:1');
+
+            // Ejecutar la solicitud cURL
+            $respuesta = curl_exec($curl);
+
+            // Verificar si la solicitud fue exitosa
+            if ($respuesta !== false) {
+                header('location: ../forms/login.html');
+                echo "Usuario registrado correctamente en el servidor WebDAV: $email_user";
+            } else {
+                echo "Error al registrar el usuario en el servidor WebDAV";
+            }
+
+            // Cerrar la sesión cURL
+            curl_close($curl);
         }
     } else {
         echo "Error en la conexión a la base de datos";
     }
 }
+
 //metodo para logear al usuario
 function login_user($email_user, $password_user)
 {

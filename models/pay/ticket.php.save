@@ -9,19 +9,19 @@ $Secret = 'EKAUavyoaR8O7PjnC-Ee0XATTUcYCAwHzkfPqWt9MX2ESFaVkuCH6C_uMDNTrTBFGJsJp
 
 // Llamada a la página de PayPal para extraer los datos del comprador
 $login = curl_init("https://api-m.sandbox.paypal.com/v1/oauth2/token");
-curl_setopt($login, CURLOPT_RETURNTRANSFER, True);
+curl_setopt($login, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($login, CURLOPT_USERPWD, $Client_ID . ":" . $Secret);
 curl_setopt($login, CURLOPT_POSTFIELDS, "grant_type=client_credentials");
 
-// Extracción del token de la venta
+// Obtener el token de autenticación
 $answer_login = curl_exec($login);
 $answer_object = json_decode($answer_login);
 $access_token = $answer_object->access_token;
 
-// Extracción de los datos del comprador
+// Obtener los datos del pedido
 $order = curl_init("https://api-m.sandbox.paypal.com/v1/checkout/orders/" . $_GET['paymentID']);
 curl_setopt($order, CURLOPT_HTTPHEADER, array("Content-Type: application/json", "Authorization: Bearer " . $access_token));
-curl_setopt($order, CURLOPT_RETURNTRANSFER, True);
+curl_setopt($order, CURLOPT_RETURNTRANSFER, true);
 $answer_data = curl_exec($order);
 $object_answer_data = json_decode($answer_data);
 curl_close($login);
@@ -35,61 +35,64 @@ $new_date = date('Y-m-d H:i:s', strtotime($date));
 $email = $object_answer_data->payer->email_address;
 $id_client = $object_answer_data->payer->payer_id;
 $name_user = $_SESSION['usuario'];
-// URL para el directorio en tu máquina webdav
-$directory_url = "http://10.0.0.4/pdfs/$name_user/";
-// Crea una instancia de TCPDF
+
+// Guardar la ruta del PDF en el servidor
+$pdfFilePath = 'comprobantes/' . $id_ticket . '_comprobante.pdf';
+
+// Inicializar TCPDF
 $pdf = new TCPDF();
 $pdf->SetCreator(PDF_CREATOR);
 $pdf->SetTitle('Comprobante de Compra');
 $pdf->SetMargins(10, 10, 10);
-// Inicializa el contenido del PDF
- $html = '
- <!DOCTYPE html>
- <html lang="es">
- <head>
- <meta charset="UTF-8">
- <meta name="viewport" content="width=device-width, initial-scale=1.0">
- <title>Comprobante de Compra</title>
- <style>
-     body {
-         font-family: Arial, sans-serif;
-     }
-     h1 {
-         color: #333;
-         font-size: 24px;
-     }
-     table {
-         width: 100%;
-         border-collapse: collapse;
-     }
-     th, td {
-         border: 1px solid #ddd;
-         padding: 8px;
-         text-align: left;
-     }
-     th {
-         background-color: #f2f2f2;
-     }
- </style>
- </head>
- <body>
-     <h1>Comprobante de Compra</h1>
-     <p><strong>ID de Ticket:</strong> ' . $id_ticket . '</p>
-     <p><strong>Fecha:</strong> ' . $new_date . '</p>
-     <p><strong>Status:</strong> ' . $status . '</p>
-     <p><strong>Cliente:</strong> ' . $name_user . '</p>   
-     <table>
-         <thead>
-             <tr>
-                 <th>Producto</th>
-                 <th>Cantidad</th>
-                 <th>Precio Unitario</th>
-                 <th>Total</th>
-             </tr>
-         </thead>
-         <tbody>';
+$pdf->AddPage();
 
-// Calcular el total de la compra
+// Contenido del PDF
+$html = '
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comprobante de Compra</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+    h1 {
+        color: #333;
+        font-size: 24px;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    th {
+        background-color: #f2f2f2;
+    }
+</style>
+</head>
+<body>
+    <h1>Comprobante de Compra</h1>
+    <p><strong>ID de Ticket:</strong> ' . $id_ticket . '</p>
+    <p><strong>Fecha:</strong> ' . $new_date . '</p>
+    <p><strong>Status:</strong> ' . $status . '</p>
+    <p><strong>Cliente:</strong> ' . $name_user . '</p>
+    <p><strong>Correo Electrónico:</strong> ' . $email . '</p>
+    <table>
+        <thead>
+            <tr>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>';
 $total = 0;
 
 // Inserción en la tabla ticket
@@ -97,63 +100,80 @@ foreach ($_SESSION['CART'] as $index => $product) {
     $product_name = $product['product_name'];
     $product_stock = $product['product_stock'];
     $amount = $product['product_price'];
-    $product_total = $product_stock * $amount;
-    $total += $product_total;
- // Agrega los datos del producto al HTML del PDF
-    // Agregar fila de producto a la tabla
-    $html .= "
-        <tr>
-            <td>$product_name</td>
-            <td>$product_stock</td>
-            <td>\$$amount</td>
-            <td>\$" . number_format($product_total, 2) . "</td>
-        </tr>";
     $sql = "INSERT INTO ticket(id_ticket,id_client,nombre_usuario,nombre_producto,cantidad,monto,estado,fecha,email) VALUES('$id_ticket','$id_client','$name_user','$product_name','$product_stock','$amount','$status','$new_date','$email')";
     $connection->run_query($sql);
+
+    // Agregar filas al PDF
+    $html .= '
+            <tr>
+                <td>' . $product_name . '</td>
+                <td>' . $product_stock . '</td>
+                <td>$' . $amount . '</td>
+                <td>$' . number_format($amount, 2) . '</td>
+            </tr>';
+    $total += $amount * $product_stock;
 }
-$html .= "
+
+$html .= '
         </tbody>
         <tfoot>
             <tr>
-                <td colspan='3' align='right'><strong>Total:</strong></td>
-                <td>\$" . number_format($total, 2) . "</td>
+                <td colspan="3" align="right"><strong>Total:</strong></td>
+                <td>$' . number_format($total, 2) . '</td>
             </tr>
         </tfoot>
-    </table>";
-// Agrega el HTML al PDF
-$pdf->AddPage();
+    </table>
+</body>
+</html>';
+
+// Agregar contenido al PDF y cerrar
 $pdf->writeHTML($html, true, false, true, false, '');
-// Guarda el PDF en una variable
-$pdf_content = $pdf->Output('', 'S');
-// Configura la solicitud CURL para enviar el PDF al directorio
-$curl = curl_init();
-curl_setopt_array($curl, array(
-    CURLOPT_URL => $directory_url . $id_ticket . '_comprobante.pdf',
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_PUT => true,
-    CURLOPT_INFILESIZE => strlen($pdf_content),
-    CURLOPT_HTTPAUTH => CURLAUTH_BASIC,
-    CURLOPT_USERPWD => "administrador@gmail.com:12345",
-    CURLOPT_SSL_VERIFYPEER => false,
-    CURLOPT_INFILE => fopen('data://text/plain;base64,' . base64_encode($pdf_content), 'r'),
-));
-// Ejecuta la solicitud CURL para enviar el PDF al directorio
+
+// Guardar el PDF en el servidor
+$pdf->Output($_SERVER['DOCUMENT_ROOT'] . '/' . $pdfFilePath, 'F');
+
+// Guardar la ruta del PDF en el servidor WebDAV
+$userDirectory = 'user; // Aquí deberías obtener el directorio del usuario
+$userPdfDirectory = 'http://10.0.0.4/pdfs/' . $userDirectory . '/';
+$fileUrl = $userPdfDirectory . $id_ticket . '_comprobante.pdf';
+
+// Verificar si el directorio del usuario existe, si no existe, crearlo
+$curl = curl_init($userPdfDirectory);
+curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+curl_setopt($curl, CURLOPT_USERPWD, 'administrador@gmail.com:12345');
+curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'MKCOL');
 $response = curl_exec($curl);
-
-// Obtiene el código de respuesta HTTP
-$http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-// Verifica si se envió el PDF correctamente
-if ($http_code == 201) {
-    echo "PDF enviado con éxito al directorio: $directory_url{$_SESSION['usuario']}/$id_ticket\_comprobante.pdf";
-} else {
-    echo "Error al enviar el PDF al directorio: $directory_url{$_SESSION['usuario']}/$id_ticket\_comprobante.pdf";
-}
-
-// Cierra CURL
 curl_close($curl);
-?>
 
+// Si el directorio del usuario se creó correctamente, enviar el archivo PDF
+if ($response !== false) {
+    // Configurar cURL para enviar el archivo PDF al directorio del usuario
+    $curl = curl_init($fileUrl);
+    curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_setopt($curl, CURLOPT_USERPWD, 'administrador@gmail.com:12345');
+    curl_setopt($curl, CURLOPT_PUT, true);
+    curl_setopt($curl, CURLOPT_INFILE, fopen($_SERVER['DOCUMENT_ROOT'] . '/' . $pdfFilePath, 'r'));
+    curl_setopt($curl, CURLOPT_INFILESIZE, filesize($_SERVER['DOCUMENT_ROOT'] . '/' . $pdfFilePath));
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+    // Eliminar el archivo PDF temporal del servidor
+    unlink($_SERVER['DOCUMENT_ROOT'] . '/' . $pdfFilePath);
+
+    if ($response !== false) {
+        // El archivo se envió correctamente al servidor WebDAV
+        echo "El archivo PDF se envió correctamente al directorio del usuario.";
+    } else {
+        // Error al enviar el archivo PDF al servidor WebDAV
+        echo "Error al enviar el archivo PDF al servidor WebDAV.";
+    }
+} else {
+    // Error al crear el directorio del usuario
+    echo "Error al crear el directorio del usuario en el servidor WebDAV.";
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 

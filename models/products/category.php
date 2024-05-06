@@ -1,5 +1,5 @@
 <?php
-require('C:/xampp/htdocs/Tecno-Total-web/models/conf/configuration.php');
+require('/var/www/Tecno-Total-web/models/conf/configuration.php');
 function category()
 {
     $category = isset($_GET['Categoria']) ? $_GET['Categoria'] : '';
